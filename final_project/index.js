@@ -8,45 +8,42 @@ const genl_routes = require('./router/general.js').general; // Routes for everyo
 // Create our web server app
 const app = express();
 
-// Tell our app to understand messages in a special language called JSON.
+// Middleware to parse JSON bodies
 app.use(express.json());
 
-// Tell our app to use a secret session when a customer goes to "/customer"
-// A session is like a backpack that remembers who you are.
+// Use a secret session for routes under "/customer"
+// The session acts like a backpack to remember who the user is.
 app.use("/customer", session({
-  secret: "fingerprint_customer", // This is a secret code to keep your session safe.
+  secret: "fingerprint_customer", // Secret used to sign the session ID cookie
   resave: true, 
   saveUninitialized: true
 }));
 
-// For any request to "/customer/auth/*", check if the user has a secret token.
-app.use("/customer/auth/*", function auth(req, res, next) {
-    // Look in the session backpack for our secret token.
+// For any request to "/customer/auth/*", check if the user has a valid token.
+app.use("/customer/auth/*", (req, res, next) => {
+    // Check if the session contains an authorization token.
     if (req.session.authorization) {
         let token = req.session.authorization['accessToken'];
-
-        // Check if the token is correct using our secret word "access".
+        // Verify the token using our secret word "access"
         jwt.verify(token, "access", (err, user) => {
             if (!err) {
-                req.user = user; // Save the user info for later.
-                next(); // Let the user continue to the page.
+                req.user = user; // Save user info for later use
+                next(); // Proceed to the next middleware/route
             } else {
-                // If the token is wrong, say "No, you can't come here."
                 return res.status(403).json({ message: "User not authenticated" });
             }
         });
     } else {
-        // If there's no token at all, say "No, you must log in first."
         return res.status(403).json({ message: "User not logged in" });
     }
 });
 
-// This is the door number where our app listens for visitors.
-const PORT = 5000;
-
-// Use the routes for customers and general visitors.
+// Mount customer routes (for authenticated users)
 app.use("/customer", customer_routes);
+
+// Mount general routes (accessible to everyone)
 app.use("/", genl_routes);
 
-// Start the server and say "Server is running" in our console.
-app.listen(PORT, () => console.log("Server is running"));
+// Start the server on port 5000
+const PORT = 5000;
+app.listen(PORT, () => console.log("Server is running on port " + PORT));
